@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
   Image,
   View,
@@ -6,12 +6,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
+  Alert,
 } from 'react-native';
 
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { Form } from '@unform/mobile';
 import { FormHandles } from '@unform/core';
+import * as Yup from 'yup';
+import api from '../../services/api';
+
+import getValidationErrors from '../../utils/getValidationErros';
 
 import Input from '../../components/Input';
 import Button from '../../components/Button';
@@ -26,6 +31,43 @@ const SignUp: React.FC = () => {
 
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+
+  interface signUpFormData {
+    email: string;
+    password: string;
+  }
+
+  const handleSignUp = useCallback(async (data: signUpFormData) => {
+    try {
+      formRef.current?.setErrors([]);
+
+      const schema = Yup.object().shape({
+        name: Yup.string().required('Nome obrrigatorio'),
+        email: Yup.string()
+          .required('E-mail obrigatorio')
+          .email('Digite um e-mail valido'),
+        password: Yup.string().min(6, 'No minimo 6 digitos'),
+      });
+
+      await schema.validate(data, {
+        abortEarly: false,
+      });
+
+      await api.post('/users', data);
+    } catch (err) {
+      if (err instanceof Yup.ValidationError) {
+        const erros = getValidationErrors(err);
+
+        formRef.current?.setErrors(erros);
+        return;
+      }
+      Alert.alert(
+        'Erro na autenticação',
+        'Ocorreu um erro ao fazer login, cheque as crendenciais',
+      );
+    }
+  }, []);
+
   return (
     <>
       <KeyboardAvoidingView
@@ -43,7 +85,7 @@ const SignUp: React.FC = () => {
               <Title>Crie sua conta</Title>
             </View>
 
-            <Form ref={formRef} onSubmit={() => {}}>
+            <Form ref={formRef} onSubmit={handleSignUp}>
               <Input
                 autoCapitalize="words"
                 name="name"
